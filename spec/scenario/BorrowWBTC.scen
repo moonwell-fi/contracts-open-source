@@ -1,0 +1,63 @@
+
+Test "Borrow some WBTC enters WBTC and succeeds when not entered"
+    Invariant Success
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken WBTC qiWBTC tokenType:WBTC
+    Give qiWBTC 10e8 WBTC -- Faucet some WBTC to borrow
+    Support qiZRX collateralFactor:0.5
+    Support qiWBTC collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX
+    Borrow Geoff 1e8 qiWBTC
+    Assert Equal (qiToken qiWBTC BorrowBalance Geoff) (Exactly 1e8)
+    Assert Equal (Erc20 WBTC TokenBalance Geoff) (Exactly 1e8)
+    Assert Equal (Erc20 WBTC TokenBalance qiWBTC) (Exactly 9e8)
+
+Test "Borrow some WBTC fails when no WBTC available"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken WBTC qiWBTC tokenType:WBTC
+    Support qiZRX collateralFactor:0.5
+    Support qiWBTC collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiWBTC
+    Invariant Static (QiToken qiZRX ExchangeRateStored)
+    AllowFailures
+    Borrow Geoff 1e8 qiWBTC
+    Assert Failure TOKEN_INSUFFICIENT_CASH BORROW_CASH_NOT_AVAILABLE
+
+Test "Borrow some WBTC fails when WBTC paused"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken WBTC qiWBTC tokenType:WBTC
+    Give qiWBTC 10e8 WBTC -- Faucet some WBTC to borrow
+    Support qiZRX collateralFactor:0.5
+    Support qiWBTC collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiWBTC
+    Invariant Static (QiToken qiZRX ExchangeRateStored)
+    Erc20 WBTC Pause
+    AllowFailures
+    Borrow Geoff 1e8 qiWBTC
+    Assert Revert
+
+Test "Borrow some WBTC from Excess Cash"
+    Invariant Success
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken WBTC qiWBTC tokenType:WBTC
+    Give qiWBTC 10e8 WBTC -- Faucet some WBTC to borrow
+    Support qiZRX collateralFactor:0.5
+    Support qiWBTC collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiWBTC
+    Borrow Geoff 1e8 qiWBTC
+    EnterMarkets Geoff qiZRX qiWBTC
+    Assert Equal (qiToken qiWBTC BorrowBalance Geoff) (Exactly 1e8)
+    Assert Equal (Erc20 WBTC TokenBalance Geoff) (Exactly 1e8)
+    Assert Equal (Erc20 WBTC TokenBalance qiWBTC) (Exactly 9e8)

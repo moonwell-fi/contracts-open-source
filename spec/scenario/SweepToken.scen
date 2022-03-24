@@ -1,0 +1,29 @@
+
+Test "Attempt to sweep underlying token"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 BAT -- Faucet some bat to sweep
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    AllowFailures
+    qiToken qiBAT SweepToken BAT
+    Assert Revert "revert QiErc20::sweepToken: can not sweep underlying token"
+
+Test "Succesfully Sweep standard non-underlying token from QiErc20"
+    NewComptroller price:1.0
+    Erc20 Deploy Standard ZRX "ZRX" 18
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 ZRX -- Faucet some ZRX to sweep
+    Support qiBAT collateralFactor:0.5
+    qiToken qiBAT SweepToken ZRX
+    Assert Equal (Erc20 ZRX TokenBalance Admin) (10e18)
+
+Test "Succesfully Sweep non-standard non-underlying token from QiErc20"
+    NewComptroller price:1.0
+    Erc20 Deploy NonStandard USDT "USDT" 18
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 USDT -- Faucet some USDT to sweep
+    Support qiBAT collateralFactor:0.5
+    qiToken qiBAT SweepToken USDT
+    Assert Equal (Erc20 USDT TokenBalance Admin) (10e18)

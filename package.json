@@ -1,0 +1,58 @@
+{
+  "name": "moonwell-core",
+  "version": "1.0.0",
+  "description": "The Moonwell Money Market",
+  "main": "index.js",
+  "scripts": {
+    "build-hardhat-plugin": "git submodule update --init && cd hardhat-storage-layout && npm i && npm run build && cd ..",
+    "pre-deploy": "npm run build-hardhat-plugin && npm run hardhat:compile",
+    "deploy-moonbase-alpha": "npm run pre-deploy && npx hardhat run --network testnet script/hardhat/deploy.ts",
+    "deploy-moonriver": "npm run pre-deploy && npx hardhat run --network moonriver script/hardhat/deploy.ts",
+    "deploy-moonbeam": "npm run pre-deploy && echo 'TODO(keefertaylor): Place deploy MR pipeline here'",
+    "hardhat:compile": "hardhat clean && hardhat compile",
+    "compile": "./script/compile",
+    "console": "if node -v | grep -E \"v(12|13)\" > /dev/null; then flags=\"-n --experimental-repl-await\"; fi; npx $flags saddle console",
+    "coverage": "./script/coverage",
+    "deploy": "./scenario/script/repl -s ./script/scen/deploy.scen",
+    "lint": "./script/lint",
+    "repl": "./scenario/script/repl",
+    "profile": "yarn test tests/gasProfiler.js",
+    "report": "npx run ./script/saddle/gasReport.js",
+    "test": "./script/test",
+    "test:prepare": "NO_RUN=true ./script/test",
+    "checksize": "npx run ./script/saddle/comptrollerSize.js"
+  },
+  "author": "Moonwell",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.5",
+    "@nomiclabs/hardhat-etherscan": "^3.0.1",
+    "@nomiclabs/hardhat-truffle5": "^2.0.4",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
+    "@openzeppelin/contracts": "^4.5.0",
+    "@openzeppelin/hardhat-upgrades": "^1.14.0",
+    "@openzeppelin/test-helpers": "^0.5.15",
+    "bignumber.js": "9.0.0",
+    "chai": "^4.3.6",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.5.3",
+    "hardhat": "^2.8.2",
+    "hardhat-storage-layout": "^0.1.6",
+    "jest-diff": "^26.4.2",
+    "jest-junit": "^11.1.0",
+    "solium": "^1.2.5",
+    "solparse": "^2.2.8",
+    "ts-node": "^10.4.0"
+  },
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^1.4.1",
+    "dotenv": "^10.0.0",
+    "hardhat-abi-exporter": "^2.8.0",
+    "keccak256": "^1.0.6"
+  },
+  "resolutions": {
+    "scrypt.js": "https://registry.npmjs.org/@compound-finance/ethereumjs-wallet/-/ethereumjs-wallet-0.6.3.tgz",
+    "**/ganache-core": "github:compound-finance/ganache-core.git#jflatow/unbreak-fork"
+  }
+}

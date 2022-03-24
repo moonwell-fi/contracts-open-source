@@ -1,0 +1,50 @@
+
+Test "Fail to seize calling directly"
+    NewComptroller
+    ListedQiToken ZRX qiZRX initialExchangeRate:1e9
+    ListedQiToken BAT qiBAT initialExchangeRate:1e9
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 50e18 qiZRX
+    Invariant Remains (Erc20 qiZRX TokenBalance Geoff) 50e9
+    AllowFailures
+    Seize 1e9 qiZRX caller:Geoff liquidator:Geoff borrower:Torrey
+    -- The caller must be from another qiToken market, thus this fails
+    Assert Failure COMPTROLLER_REJECTION LIQUIDATE_SEIZE_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Seize tokens with a paused WBTC qiToken-- like normal"
+    NewComptroller
+    ListedQiToken ZRX qiZRX initialExchangeRate:1e9
+    ListedQiToken WBTC qiWBTC initialExchangeRate:0.1 tokenType:WBTC
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 50e18 qiZRX
+    Erc20 WBTC Pause
+    Invariant Remains (Erc20 qiZRX TokenBalance Geoff) 50e9
+    AllowFailures
+    Seize 1e9 qiWBTC caller:Geoff liquidator:Geoff borrower:Torrey
+    -- The caller must be from another qiToken market, thus this fails
+    Assert Failure COMPTROLLER_REJECTION LIQUIDATE_SEIZE_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Not able to seize tokens with a malicious unlisted qiToken"
+    NewComptroller
+    ListedQiToken ZRX qiZRX initialExchangeRate:1e9
+    NewQiTokenImmutable EVL qiEVL initialExchangeRate:1e9 qiTokenType:QiEvil
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 50e18 qiZRX
+    Invariant Remains (Erc20 qiZRX TokenBalance Geoff) 50e9
+    Invariant Static (Erc20 qiZRX TokenBalance Geoff)
+    Invariant Static (Erc20 qiZRX TokenBalance Torrey)
+    AllowFailures
+    EvilSeize qiEVL 1e9 qiZRX seizer:Geoff seizee:Torrey
+    -- The caller must be from another qiToken market, thus this fails
+    Assert Failure COMPTROLLER_REJECTION LIQUIDATE_SEIZE_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Able to seize tokens with a malicious listed qiToken"
+    NewComptroller
+    ListedQiToken ZRX qiZRX initialExchangeRate:1e9
+    ListedQiTokenImmutable EVL qiEVL initialExchangeRate:1e9 qiTokenType:QiEvil
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 50e18 qiZRX
+    Assert Equal (Erc20 qiZRX TokenBalance Geoff) 50e9
+    Expect Changes (Erc20 qiZRX TokenBalance Geoff) -1e9
+    Expect Changes (Erc20 qiZRX TokenBalance Torrey) +1e9
+    EvilSeize qiEVL 1e9 qiZRX seizer:Torrey seizee:Geoff

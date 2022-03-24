@@ -1,0 +1,129 @@
+-- Tests for the grants and math patch
+
+Macro FlywheelComptroller price=1.0 borrowRate=0.000005 qiInitAmount=5000000e18
+    Unitroller Deploy
+    PriceOracle Deploy Fixed price
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
+    ----g2
+    ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
+    Unitroller SetPendingImpl ComptrollerScenG2
+    ComptrollerImpl ComptrollerScenG2 BecomeG2
+    --list some tokens
+    Comptroller SetPriceOracle (PriceOracleProxy Address)
+    Comptroller SetMaxAssets 20
+    Comptroller SetCloseFactor 0.5
+    Comptroller LiquidationIncentive 1.1
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    -- final
+    ComptrollerImpl Deploy ScenarioG3 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG3 1e18 [qiZRX qiBAT]
+    Erc20 Deploy Standard BENQI "BENQI Token" 18
+    Give (Address Comptroller) qiInitAmount BENQI
+
+Macro GrantsComptroller
+    FlywheelComptroller
+    -- g4
+    ComptrollerImpl Deploy ScenarioG4 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG4
+    -- g5
+    ComptrollerImpl Deploy ScenarioG5 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG5
+    -- g6
+    ComptrollerImpl Deploy ScenarioG6 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG6
+    -- current
+    ComptrollerImpl Deploy Scenario ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen Become
+
+Macro InitSpeeds
+    Prep Geoff 100e18 ZRX qiZRX
+    Mint Geoff 50e18 qiZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
+    Prep Coburn Some BAT qiBAT
+    Mint Coburn 6e18 qiBAT--tokenbalance = 6e18 / 2e9 = 3e9
+    EnterMarkets Coburn qiBAT
+    Borrow Coburn 1e18 qiZRX
+    Comptroller SetQiSpeed qiZRX 1
+    Comptroller SetQiSpeed qiBAT 1
+    Comptroller RefreshQiSpeeds
+    Comptroller Send "setQiAddress(address)" (Address BENQI)
+
+Test "BENQI can be granted in combination with liquidity rewards"
+    GrantsComptroller
+    InitSpeeds
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 0
+    FastForward 1000 Blocks
+    Comptroller ClaimQi Geoff
+    Comptroller Send "_grantQi(address,uint256)" (Address Geoff) 1000
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 1000000000000000001000
+
+Test "BENQI can be granted"
+    -- Can be granted once
+    GrantsComptroller
+    InitSpeeds
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 0
+    Comptroller Send "_grantQi(address,uint256)" (Address Geoff) 1000
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 1000
+    -- Assert Log QiGranted (recipient (Address Geoff)) (amount "1000")
+    -- Can be granted multiple times
+    Comptroller Send "_grantQi(address,uint256)" (Address Geoff) 2000
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 3000
+
+Test "BENQI can be streamed to contributors"
+    GrantsComptroller
+    InitSpeeds
+    Assert Equal (Comptroller QiAccrued Torrey) 0
+    Assert Equal (Erc20 BENQI TokenBalance Torrey) 0
+    Comptroller Send "_setContributorQiSpeed(address,uint256)" (Address Torrey) 300
+    -- Assert Log ContributorQiSpeedUpdated (recipient (Address Torrey)) (amount "300")
+    FastForward 1000 Blocks
+    -- Just claimQi does not receive BENQI
+    Comptroller ClaimQi Torrey
+    Assert Equal (Comptroller QiAccrued Torrey) 0
+    Assert Equal (Erc20 BENQI TokenBalance Torrey) 0
+    -- Calling updateContributorRewards and then claimQi receives BENQI
+    Comptroller UpdateContributorRewards Torrey
+    Assert Equal (Comptroller QiAccrued Torrey) 300000
+    Comptroller ClaimQi Torrey
+    Assert Equal (Comptroller QiAccrued Torrey) 0
+    Assert Equal (Erc20 BENQI TokenBalance Torrey) 300000
+
+Test "BENQI can be streamed in combination with liquidity rewards"
+    GrantsComptroller
+    InitSpeeds
+    Comptroller Send "_setContributorQiSpeed(address,uint256)" (Address Geoff) 300
+    FastForward 1000 Blocks
+    -- Just claimQi does not receive BENQI
+    Comptroller UpdateContributorRewards Geoff
+    Assert Equal (Comptroller QiAccrued Geoff) 300000
+    Comptroller ClaimQi Geoff
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 1000000000000000300000
+
+Test "BENQI streaming can be changed for contributors"
+    GrantsComptroller
+    InitSpeeds
+    Comptroller Send "_setContributorQiSpeed(address,uint256)" (Address Torrey) 300
+    FastForward 1000 Blocks
+    Comptroller Send "_setContributorQiSpeed(address,uint256)" (Address Torrey) 600
+    FastForward 1000 Blocks
+    Comptroller UpdateContributorRewards Torrey
+    Comptroller ClaimQi Torrey
+    Assert Equal (Comptroller QiAccrued Torrey) 0
+    Assert Equal (Erc20 BENQI TokenBalance Torrey) 900000
+    Comptroller Send "_setContributorQiSpeed(address,uint256)" (Address Torrey) 0
+    FastForward 2000 Blocks
+    Assert Equal (Comptroller QiAccrued Torrey) 0
+    Assert Equal (Erc20 BENQI TokenBalance Torrey) 900000

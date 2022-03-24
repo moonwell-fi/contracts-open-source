@@ -1,0 +1,103 @@
+
+Test "Borrow some BAT and enters BAT if BAT not entered"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 BAT -- Faucet some bat to borrow
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX
+    Borrow Geoff 1e18 qiBAT
+    Assert Equal (qiToken qiBAT BorrowBalance Geoff) (Exactly 1e18)
+    Assert Equal (Erc20 BAT TokenBalance Geoff) (Exactly 1e18)
+    Assert Equal (Erc20 BAT TokenBalance qiBAT) (Exactly 9e18)
+    Assert Equal (Comptroller MembershipLength Geoff) (Exactly 2)
+    Assert True (Comptroller CheckMembership Geoff qiZRX)
+    Assert True (Comptroller CheckMembership Geoff qiBAT)
+
+Test "Borrow some BAT fails, but user still entered"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX
+    Invariant Static (Erc20 BAT TokenBalance Geoff)
+    Invariant Static (Erc20 BAT TokenBalance qiBAT)
+    AllowFailures
+    Borrow Geoff 1e18 qiBAT
+    Assert Failure TOKEN_INSUFFICIENT_CASH BORROW_CASH_NOT_AVAILABLE
+    Assert Equal (Comptroller MembershipLength Geoff) (Exactly 2)
+    Assert True (Comptroller CheckMembership Geoff qiZRX)
+    Assert True (Comptroller CheckMembership Geoff qiBAT)
+
+Test "Borrow some BAT fails when no BAT available"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiBAT
+    Invariant Static (QiToken qiZRX ExchangeRateStored)
+    AllowFailures
+    Borrow Geoff 1e18 qiBAT
+    Assert Failure TOKEN_INSUFFICIENT_CASH BORROW_CASH_NOT_AVAILABLE
+
+Test "Borrow fails if market not listed"
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 BAT -- Faucet some bat to borrow
+    Support qiZRX collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX
+    AllowFailures
+    Borrow Geoff 1e18 qiBAT
+    Assert Failure COMPTROLLER_REJECTION BORROW_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Borrow some BAT from Excess Cash"
+    Invariant Success
+    NewComptroller price:1.0
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 BAT -- Faucet some bat to borrow
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiBAT
+    Borrow Geoff 1e18 qiBAT
+    Assert Equal (qiToken qiBAT BorrowBalance Geoff) (Exactly 1e18)
+    Assert Equal (Erc20 BAT TokenBalance Geoff) (Exactly 1e18)
+    Assert Equal (Erc20 BAT TokenBalance qiBAT) (Exactly 9e18)
+
+Test "Borrow some BAT reverts if borrow is paused"
+    NewComptroller price:1.0
+    Comptroller SetPauseGuardian Coburn
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Give qiBAT 10e18 BAT -- Faucet some bat to borrow
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiBAT
+    From Coburn (Comptroller SetGuardianMarketPaused qiBAT "Borrow" True)
+    AllowFailures
+    Borrow Geoff 1e18 qiBAT
+    Assert Revert "revert borrow is paused"
+    Assert Equal (qiToken qiBAT BorrowBalance Geoff) 0
+    Assert Equal (Erc20 BAT TokenBalance Geoff) 0
+    Assert Equal (Erc20 BAT TokenBalance qiBAT) (Exactly 10e18)
+    Comptroller SetGuardianMarketPaused qiBAT "Borrow" False
+    Borrow Geoff 1e18 qiBAT
+    Assert Equal (qiToken qiBAT BorrowBalance Geoff) (Exactly 1e18)
+    Assert Equal (Erc20 BAT TokenBalance Geoff) (Exactly 1e18)
+    Assert Equal (Erc20 BAT TokenBalance qiBAT) (Exactly 9e18)

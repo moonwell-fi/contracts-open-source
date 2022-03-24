@@ -1,0 +1,43 @@
+
+Test "Set admin"
+    NewComptroller
+    NewQiToken ZRX qiZRX
+    Assert Equal (QiToken qiZRX Admin) (Address Root)
+    Assert Equal (QiToken qiZRX PendingAdmin) (Address Zero)
+    From Root (QiToken qiZRX SetPendingAdmin Geoff)
+    Assert Equal (QiToken qiZRX Admin) (Address Root)
+    Assert Equal (QiToken qiZRX PendingAdmin) (Address Geoff)
+    From Geoff (QiToken qiZRX AcceptAdmin)
+    Assert Equal (QiToken qiZRX Admin) (Address Geoff)
+    Assert Equal (QiToken qiZRX PendingAdmin) (Address Zero)
+
+Test "Set admin to contructor argument"
+    NewComptroller
+    NewQiToken ZRX qiZRX admin:Torrey
+    Assert Equal (QiToken qiZRX Admin) (Address Torrey)
+    Assert Equal (QiToken qiZRX PendingAdmin) (Address Zero)
+    From Torrey (QiToken qiZRX SetPendingAdmin Geoff)
+    Assert Equal (QiToken qiZRX Admin) (Address Torrey)
+    Assert Equal (QiToken qiZRX PendingAdmin) (Address Geoff)
+    From Geoff (QiToken qiZRX AcceptAdmin)
+    Assert Equal (QiToken qiZRX Admin) (Address Geoff)
+    Assert Equal (QiToken qiZRX PendingAdmin) (Address Zero)
+
+
+Test "Fail to set pending admin"
+    NewComptroller
+    NewQiToken ZRX qiZRX
+    Invariant Remains (QiToken qiZRX Admin) (Address Root)
+    Invariant Remains (QiToken qiZRX PendingAdmin) (Address Zero)
+    AllowFailures
+    From Geoff (QiToken qiZRX SetPendingAdmin Geoff)
+    Assert Failure UNAUTHORIZED SET_PENDING_ADMIN_OWNER_CHECK
+
+Test "Fail to accept admin"
+    NewComptroller
+    NewQiToken ZRX qiZRX
+    Invariant Remains (QiToken qiZRX Admin) (Address Root)
+    Invariant Remains (QiToken qiZRX PendingAdmin) (Address Zero)
+    AllowFailures
+    From Geoff (QiToken qiZRX AcceptAdmin)
+    Assert Failure UNAUTHORIZED ACCEPT_ADMIN_PENDING_ADMIN_CHECK

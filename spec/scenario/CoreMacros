@@ -1,0 +1,255 @@
+-- These are included in each scenario
+
+Macro Successfully
+    Invariant Success
+
+Macro AllowFailures
+    ClearInvariants Success
+
+Macro PricedComptroller closeFactor=0.1 maxAssets=20
+    Unitroller Deploy
+    PriceOracle Deploy Simple
+    ComptrollerImpl Deploy ScenarioG1 ScenComptrollerG1
+    Unitroller SetPendingImpl ScenComptrollerG1
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero) -- if listing qiAvax use ListedAvaxToken to replace proxy
+    ComptrollerImpl ScenComptrollerG1 BecomeG1 (PriceOracleProxy Address) closeFactor maxAssets
+    ComptrollerImpl Deploy Scenario ScenComptroller
+    Unitroller SetPendingImpl ScenComptroller
+    ComptrollerImpl ScenComptroller Become
+
+Macro NewComptroller price=1.0 closeFactor=0.1 maxAssets=20
+    --g1
+    Unitroller Deploy
+    PriceOracle Deploy Fixed price
+    ComptrollerImpl Deploy ScenarioG1 ScenComptrollerG1
+    Unitroller SetPendingImpl ScenComptrollerG1
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero) -- if listing qiAvax use ListedAvaxToken to replace proxy
+    ComptrollerImpl ScenComptrollerG1 BecomeG1 (PriceOracleProxy Address) closeFactor maxAssets
+    --g2
+    ComptrollerImpl Deploy StandardG2 ComptrollerG2
+    Unitroller SetPendingImpl ComptrollerG2
+    ComptrollerImpl ComptrollerG2 BecomeG2
+    --g3
+    ComptrollerImpl Deploy StandardG3 ComptrollerG3
+    Unitroller SetPendingImpl ComptrollerG3
+    ComptrollerImpl ComptrollerG3 BecomeG3 1e18 []
+    --g4
+    ComptrollerImpl Deploy StandardG4 ComptrollerG4
+    Unitroller SetPendingImpl ComptrollerG4
+    ComptrollerImpl ComptrollerG4 BecomeG4
+    --g5
+    ComptrollerImpl Deploy ScenarioG5 ComptrollerG5
+    Unitroller SetPendingImpl ComptrollerG5
+    ComptrollerImpl ComptrollerG5 BecomeG5
+    --g6
+    ComptrollerImpl Deploy ScenarioG6 ComptrollerG6
+    Unitroller SetPendingImpl ComptrollerG6
+    ComptrollerImpl ComptrollerG6 BecomeG6
+    --current
+    ComptrollerImpl Deploy Scenario ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen Become
+
+Macro NewQiToken erc20 qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 tokenType=Standard delegatorType=QiErc20DelegatorScenario qiTokenType=QiErc20DelegateScenario admin=Admin becomeImplementationData="0x0"
+    Erc20 Deploy tokenType erc20 erc20
+    InterestRateModel Deploy Fixed StdInterest borrowRate -- Note: interest rate model probably shouldn't be global
+    QiTokenDelegate Deploy qiTokenType qiErc20Delegate
+    QiToken Deploy delegatorType qiToken qiToken (Erc20 erc20 Address) (Comptroller Address) (InterestRateModel StdInterest Address) initialExchangeRate decimals admin (QiTokenDelegate qiErc20Delegate Address) becomeImplementationData
+
+-- Same as NewQiToken but does not deploy an ERC20. Used for special ERC20s that are initialized differently
+Macro NewQiTokenBringERC20 erc20 qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 delegatorType=QiErc20DelegatorScenario qiTokenType=QiErc20DelegateScenario admin=Admin becomeImplementationData="0x0"
+    InterestRateModel Deploy Fixed StdInterest borrowRate -- Note: interest rate model probably shouldn't be global
+    QiTokenDelegate Deploy qiTokenType qiErc20Delegate
+    QiToken Deploy delegatorType qiToken qiToken (Erc20 erc20 Address) (Comptroller Address) (InterestRateModel StdInterest Address) initialExchangeRate decimals admin (QiTokenDelegate qiErc20Delegate Address) becomeImplementationData
+
+Macro NewQiTokenImmutable erc20 qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 tokenType=Standard qiTokenType=Scenario admin=Admin
+    Erc20 Deploy tokenType erc20 erc20
+    InterestRateModel Deploy Fixed StdInterest borrowRate -- Note: interest rate model probably shouldn't be global
+    QiToken Deploy qiTokenType qiToken qiToken (Erc20 erc20 Address) (Comptroller Address) (InterestRateModel StdInterest Address) initialExchangeRate decimals admin
+
+Macro NewAvaxToken qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 admin=Admin
+    InterestRateModel Deploy Fixed StdInterest borrowRate -- Note: interest rate model probably shouldn't be global
+    QiToken Deploy QiAvaxScenario qiToken qiToken (Comptroller Address) (InterestRateModel StdInterest Address) initialExchangeRate decimals admin
+
+Macro ListedQiToken erc20 qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 tokenType=Standard delegatorType=QiErc20DelegatorScenario qiTokenType=QiErc20DelegateScenario admin=Admin
+    NewQiToken erc20 qiToken borrowRate initialExchangeRate decimals tokenType delegatorType qiTokenType admin
+    Comptroller SupportMarket qiToken
+
+Macro ListedQiTokenImmutable erc20 qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 tokenType=Standard qiTokenType=Scenario admin=Admin
+    NewQiTokenImmutable erc20 qiToken borrowRate initialExchangeRate decimals tokenType qiTokenType admin
+    Comptroller SupportMarket qiToken
+
+Macro ListedAvaxToken qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 admin=Admin
+    NewAvaxToken qiToken borrowRate initialExchangeRate decimals admin
+    Comptroller SupportMarket qiToken
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address qiAVAX) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
+    Comptroller SetPriceOracle (PriceOracleProxy Address)
+
+Macro ListedAvaxTokenMinted qiToken borrowRate=0.000005 initialExchangeRate=2e9 decimals=8 admin=Admin
+    NewAvaxToken qiToken borrowRate initialExchangeRate decimals admin
+    Comptroller SupportMarket qiToken
+    CallMintAvax Root 1e18 qiToken
+
+Macro SetPriceCF qiToken price collateralFactor
+    PriceOracle SetPrice qiToken price
+    Comptroller SetCollateralFactor qiToken collateralFactor
+
+Macro Give user amount erc20
+    Erc20 erc20 Faucet user amount
+
+Macro Donate token amount
+    (Trx Value amount (QiToken token Donate))
+
+Macro Prep user amount erc20 token allowanceAmount=Nothing
+    Erc20 erc20 Faucet user amount
+    From user (Erc20 erc20 Approve token (Default allowanceAmount amount))
+
+Macro Allow user token
+    From user (Erc20 (QiToken token Underlying) Approve token UInt256Max)
+
+Macro AccrueInterest token
+    QiToken token AccrueInterest
+
+Macro Mint user amount token
+    From user (QiToken token Mint amount)
+
+Macro SendMintAvax user amount token
+    From user (Trx GasPrice 0 (Trx Value amount (Send token amount)))
+
+Macro CallMintAvax user amount token
+    From user (Trx GasPrice 0 (Trx Value amount (QiToken token Mint)))
+
+Macro Redeem user amount token
+    From user (QiToken token Redeem amount)
+
+Macro RedeemAvax user amount token
+    Trx GasPrice 0 (From user (QiToken token Redeem amount))
+
+Macro RedeemUnderlying user amount token
+    From user (QiToken token RedeemUnderlying amount)
+
+Macro RedeemUnderlyingEth user amount token
+    Trx GasPrice 0 (From user (QiToken token RedeemUnderlying amount))
+
+Macro BorrowAvax user amount token
+    Trx GasPrice 0 (From user (QiToken token Borrow amount))
+
+Macro Borrow user amount token
+    From user (QiToken token Borrow amount)
+
+Macro RepayBorrow user amount token
+    From user (QiToken token RepayBorrow amount)
+
+Macro RepayBorrowAvax user amount token
+    From user (Trx GasPrice 0 (Trx Value amount (QiToken token RepayBorrow)))
+
+Macro RepayBorrowAvaxMax user amount token
+    From user (Trx GasPrice 0 (Trx Value amount (Maximillion RepayBehalf user)))
+
+Macro RepayBorrowBehalf user behalf amount token
+    From user (QiToken token RepayBorrowBehalf behalf amount)
+
+Macro RepayBorrowAvaxBehalf user behalf amount token
+    From user (Trx GasPrice 0 (Trx Value amount (QiToken token RepayBorrowBehalf behalf)))
+
+Macro Liquidate liquidator _ borrower amount token _ collateral
+    From liquidator (QiToken token Liquidate borrower collateral amount)
+
+Macro LiquidateAvaxColl liquidator _ borrower amount token _ collateral
+    From liquidator (Trx GasPrice 0 (QiToken token Liquidate borrower collateral amount))
+
+Macro LiquidateAvaxBorrow liquidator _ borrower amount token _ collateral
+    From liquidator (Trx GasPrice 0 (Trx Value amount (QiToken token Liquidate borrower collateral)))
+
+Macro Seize amount token caller liquidator borrower
+    From caller (QiToken token Seize liquidator borrower amount)
+
+Macro EvilSeize token amount treasure seizer seizee
+    QiToken token EvilSeize treasure seizer seizee amount
+
+Macro Support qiToken collateralFactor=0.5
+    Comptroller SupportMarket qiToken
+    Comptroller SetCollateralFactor qiToken collateralFactor
+
+Macro SetCollateralFactor qiToken collateralFactor=0.5
+    Comptroller SetCollateralFactor qiToken collateralFactor
+
+Macro AddReserves amount token user=Root
+    From user (QiToken token AddReserves amount)
+
+Macro ReduceReserves amount token
+    QiToken token ReduceReserves amount
+
+Macro FastForward n blocks
+    Comptroller FastForward n blocks
+
+Macro EnterMarkets user ...markets
+    From user (Comptroller EnterMarkets markets)
+
+Macro ExitMarket user market
+    From user (Comptroller ExitMarket market)
+
+Macro Transfer from to amount token
+    From from (Erc20 token Transfer to amount)
+
+Macro Cash qiToken
+    Read Erc20 (QiToken qiToken Underlying) TokenBalance qiToken
+
+Macro QuickMint amount qiToken from=Me
+    Give from amount (QiToken qiToken Underlying)
+    Allow from qiToken
+    From from (QiToken qiToken Mint amount)
+
+Macro QuickBorrow amount qiToken ...collateral
+    From Me (Comptroller EnterMarkets collateral)
+    From Me (Comptroller EnterMarkets (qiToken))
+    From Me (QiToken qiToken Borrow amount)
+
+-- Macro for performing a borrow with the sole
+-- purpose of adding interest to the erc20 market
+Macro BorrowAndRepayWithInterest erc20 qiToken amount interestAmount interestRate blocks reserveRate=0
+    -- TODO: Make invariant success for these?
+    -- TODO: Named args as macros
+    InterestRateModel Deploy Fixed Std interestRate
+    QiToken qiToken SetInterestRateModel (InterestRateModel Std Address)
+    QiToken qiToken SetReserveFactor reserveRate
+    ListedQiToken COLLAT qiCOLLAT
+    Comptroller SetCollateralFactor qiCOLLAT 0.9
+    Prep Torrey 1e30 COLLAT qiCOLLAT
+    Mint Torrey 1e30 qiCOLLAT
+    EnterMarkets Torrey qiCOLLAT qiToken
+    Assert True (Comptroller CheckMembership Torrey qiCOLLAT)
+    Assert True (Comptroller CheckMembership Torrey qiToken)
+    Borrow Torrey amount qiToken
+    -- Cool, we've borrowed, now let's accrue interest then repay all
+    FastForward blocks Blocks
+    -- RepayBorrow Torrey (QiToken BorrowBalance Torrey) qiToken
+    From Torrey (Erc20 erc20 Approve qiToken amount)
+    RepayBorrow Torrey amount qiToken
+    From Torrey (Erc20 erc20 Approve qiToken interestAmount)
+    Give Torrey interestAmount erc20
+    RepayBorrow Torrey interestAmount qiToken
+    Assert Equal (QiToken qiToken BorrowBalance Torrey) Zero
+
+-- Macro for performing a borrow with the sole
+-- purpose of adding interest to the avax market
+Macro BorrowAndRepayEthWithInterest qiAvax amount interestAmount interestRate blocks reserveRate=0
+    -- TODO: Make invariant success for these?
+    -- TODO: Named args as macros
+    InterestRateModel Deploy Fixed Std interestRate
+    QiToken qiAvax SetInterestRateModel (InterestRateModel Std Address)
+    QiToken qiAvax SetReserveFactor reserveRate
+    ListedQiToken COLLAT qiCOLLAT
+    Comptroller SetCollateralFactor qiCOLLAT 0.9
+    Prep Torrey 1e30 COLLAT qiCOLLAT
+    Mint Torrey 1e30 qiCOLLAT
+    EnterMarkets Torrey qiCOLLAT qiAvax
+    Assert True (Comptroller CheckMembership Torrey qiCOLLAT)
+    Assert True (Comptroller CheckMembership Torrey qiAvax)
+    Borrow Torrey amount qiAvax
+    -- Cool, we've borrowed, now let's accrue interest then repay all
+    FastForward blocks Blocks
+    -- RepayBorrow Torrey (QiToken BorrowBalance Torrey) qiAvax
+    RepayBorrowAvax Torrey amount qiAvax
+    RepayBorrowAvax Torrey interestAmount qiAvax
+    Assert Equal (QiToken qiAvax BorrowBalance Torrey) Zero

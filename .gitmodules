@@ -1,0 +1,6 @@
+[submodule "hardhat-storage-layout"]
+	path = hardhat-storage-layout
+	url = https://github.com/moonwell-fi/hardhat-storage-layout
+[submodule "deploy-artifacts"]
+	path = deploy-artifacts
+	url = https://github.com/moonwell-fi/deploy-artifacts

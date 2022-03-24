@@ -1,0 +1,221 @@
+-- NewComptroller, but with markets listed so that we can make them benqi markets in constructor
+Macro FlywheelComptroller price=1.0 borrowRate=0.000005 qiInitAmount=5000000e18
+    Unitroller Deploy
+    PriceOracle Deploy Fixed price
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
+    ----g2
+    ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
+    Unitroller SetPendingImpl ComptrollerScenG2
+    ComptrollerImpl ComptrollerScenG2 BecomeG2
+    --list some tokens
+    Comptroller SetPriceOracle (PriceOracleProxy Address)
+    Comptroller SetMaxAssets 20
+    Comptroller SetCloseFactor 0.5
+    Comptroller LiquidationIncentive 1.1
+    NewQiToken ZRX qiZRX
+    NewQiToken BAT qiBAT
+    Support qiZRX collateralFactor:0.5
+    Support qiBAT collateralFactor:0.5
+    -- final
+    ComptrollerImpl Deploy ScenarioG3 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG3 1e18 [qiZRX qiBAT]
+    Erc20 Deploy Standard BENQI "BENQI Token" 18
+    Give (Address Comptroller) qiInitAmount BENQI
+    Comptroller Send "setQiAddress(address)" (Address BENQI)
+
+Macro InitSpeeds
+    Prep Geoff 100e18 ZRX qiZRX
+    Mint Geoff 50e18 qiZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
+    Prep Coburn Some BAT qiBAT
+    Mint Coburn 6e18 qiBAT--tokenbalance = 6e18 / 2e9 = 3e9
+    EnterMarkets Coburn qiBAT
+    Borrow Coburn 1e18 qiZRX
+    Comptroller RefreshQiSpeeds
+
+Test "Accrue BENQI during a mint"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Mint Geoff 1e18 qiZRX
+    -- new index = initVal + deltaTimestamps * supplySpeed * 1e36 / totalSupply
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 2.5e10 = 1.2000000000001e49
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Comptroller QiSupplyState qiZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller QiSupplyState qiZRX "block") 300000
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 300000e18
+    Assert Equal (Comptroller QiSupplierIndex qiZRX Geoff) 1.2000000000001e49
+
+Test "Accrue BENQI during a borrow"
+    FlywheelComptroller
+    InitSpeeds
+    Comptroller FastForward 300000 Blocks
+    Assert Equal (Comptroller QiAccrued Coburn) 0
+    Borrow Coburn 0.1e18 qiZRX
+    -- new index = initVal + deltaTimestamps * borrowSpeed * 1e36 / totalBorrows
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 1e18 =  3.00001e41
+    Assert Equal (Comptroller QiAccrued Coburn) 0
+    Assert Equal (Comptroller QiBorrowState qiZRX "index") 3.00001e41
+    Assert Equal (Comptroller QiBorrowState qiZRX "block") 300000
+    Assert Equal (Erc20 BENQI TokenBalance Coburn) 300000e18
+    Assert Equal (Comptroller QiBorrowerIndex qiZRX Coburn) 3.00001e41
+
+Test "Accrue BENQI during a redeem"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Redeem Geoff 1e9 qiZRX
+    -- new index = initVal + deltaTimestamps * supplySpeed * 1e36 / totalSupply
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 2.5e10 = 1.2000000000001e49
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Comptroller QiSupplyState qiZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller QiSupplyState qiZRX "block") 300000
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 300000e18
+    Assert Equal (Comptroller QiSupplierIndex qiZRX Geoff) 1.2000000000001e49
+
+Test "Accrue BENQI during a repayBorrow"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Prep Coburn 0.5e18 ZRX qiZRX
+    RepayBorrow Coburn 0.5e18 qiZRX
+    -- new index = initVal + deltaTimestamps * borrowSpeed * 1e36 / totalBorrows
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 1e18 =  3.00001e41
+    Assert Equal (Comptroller QiAccrued Coburn) 0
+    Assert Equal (Comptroller QiBorrowState qiZRX "index") 3.00001e41
+    Assert Equal (Comptroller QiBorrowState qiZRX "block") 300000
+    Assert Equal (Erc20 BENQI TokenBalance Coburn) 300000e18
+    Assert Equal (Comptroller QiBorrowerIndex qiZRX Coburn) 3.00001e41
+
+Test "Accrue BENQI during a repayBorrowBehalf of 0"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    -- confirm we can init all flywheel accounts for free
+    RepayBorrowBehalf Jared Coburn 0 qiZRX
+    -- new index = initVal + deltaTimestamps * borrowSpeed * 1e36 / totalBorrows
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 1e18 = 3.00001e41
+    Assert Equal (Comptroller QiAccrued Coburn) 0
+    Assert Equal (Comptroller QiBorrowState qiZRX "index") 3.00001e41
+    Assert Equal (Comptroller QiBorrowState qiZRX "block") 300000
+    Assert Equal (Erc20 BENQI TokenBalance Coburn) 300000e18
+    Assert Equal (Comptroller QiBorrowerIndex qiZRX Coburn) 3.00001e41
+
+Test "Accrue BENQI during a liquidation"
+    FlywheelComptroller
+    InitSpeeds
+    Assert Equal (Comptroller QiSpeed qiZRX) 1e18
+    Assert Equal (Comptroller QiSpeed qiBAT) 0
+    --coburn zrx borrow, bat supply. geoff zrx supply
+    FastForward 600000 Blocks--1e18 borrow * (1 + 600000 * 0.000005) = 3.5e18 borrow > 6e18 collateral * 0.5 CF
+    Prep Geoff Some ZRX qiZRX
+    From Geoff (QiToken qiZRX Liquidate Coburn qiBAT 0.5e18)
+    -- zrx borrow index is updated and benqi distributed
+    -- * new index = initVal + deltaTimestamps * borrowSpeed * 1e36 / totalBorrows
+    -- * new index = 1e36 + 600000 * 1e18 * 1e36 / 1e18 = 6.00001E41
+    Assert Equal (Comptroller QiBorrowState qiZRX "index") 6.00001e41
+    Assert Equal (Comptroller QiBorrowState qiZRX "block") 600000
+    -- zrx supply index isnt updated and benqi isnt distributed for zrx supply
+    Assert Equal (Comptroller QiSupplyState qiZRX "index") 1e36
+    Assert Equal (Comptroller QiSupplyState qiZRX "block") 0
+    Assert Equal (Comptroller QiSupplierIndex qiZRX Geoff) 1e36--no change, minted in init
+    -- bat supply/borrow index is not updated, since there is no benqi speed
+    Assert Equal (Comptroller QiSupplyState qiBAT "index") 1e36
+    Assert Equal (Comptroller QiSupplyState qiBAT "block") 600000
+    -- neither is borrow state. block is 0 because update fn is never even called
+    Assert Equal (Comptroller QiBorrowState qiBAT "index") 1e36
+    Assert Equal (Comptroller QiBorrowState qiBAT "block") 0
+    --
+    Assert Equal (Comptroller QiSupplierIndex qiBAT Coburn) 1e36
+    Assert Equal (Comptroller QiBorrowerIndex qiZRX Coburn) 6.00001e41
+    Assert Equal (Erc20 BENQI TokenBalance Coburn) 600000e18
+    Assert Equal (Comptroller QiAccrued Coburn) 0
+    --
+    Assert Equal (Comptroller QiSupplierIndex qiBAT Geoff) 1e36
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 0
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+
+Test "Accrue BENQI during a transfer"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 0
+    Assert Equal (Comptroller QiSupplierIndex qiZRX Geoff) 1e36
+    Transfer Geoff Jared 2.5e10 qiZRX
+    -- new index = initVal + deltaTimestamps * supplySpeed * 1e36 / totalSupply
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 2.5e10 = 1.2000000000001e49
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 300000e18
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Comptroller QiSupplyState qiZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller QiSupplyState qiZRX "block") 300000
+    Assert Equal (Comptroller QiSupplierIndex qiZRX Geoff) 1.2000000000001e49
+    --
+    Assert Equal (Comptroller QiAccrued Jared) 0
+    Assert Equal (Comptroller QiSupplyState qiZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller QiSupplyState qiZRX "block") 300000
+    Assert Equal (Comptroller QiSupplierIndex qiZRX Jared) 1.2000000000001e49
+
+Test "Accrues correctly when market is added, deactivated, and activated again"
+    FlywheelComptroller
+    InitSpeeds
+    NewQiToken DAI qiDAI
+    --
+    Support qiDAI collateralFactor:0.5
+    Comptroller AddQiMarkets qiDAI
+    Assert Equal (Comptroller GetQiMarkets) [(Address qiZRX) (Address qiBAT) (Address qiDAI)]
+    Prep Jared Some DAI qiDAI
+    Mint Jared 6e18 qiDAI
+    EnterMarkets Geoff qiZRX
+    Borrow Geoff 0.5e18 qiDAI
+    Borrow Coburn 0.5e18 qiDAI
+    Comptroller RefreshQiSpeeds
+    Assert Equal (Comptroller QiSpeed qiZRX) 0.5e18
+    Assert Equal (Comptroller QiSpeed qiDAI) 0.5e18
+    --
+    FastForward 100 Blocks
+    Comptroller DropQiMarket qiDAI
+    Comptroller ClaimQi Geoff
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 75e18--half of qidai, all of zrx(.25e18 + .5e18) * 100
+    Assert Equal (Comptroller GetQiMarkets) [(Address qiZRX) (Address qiBAT)]
+    Assert Equal (Comptroller QiSpeed qiZRX) 1e18
+    Assert Equal (Comptroller QiSpeed qiDAI) 0
+    --
+    FastForward 100 Blocks
+    Comptroller ClaimQi Geoff
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 175e18-- += 1e18 * 100
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    --
+    Comptroller AddQiMarkets qiDAI
+    FastForward 100 Blocks
+    Comptroller ClaimQi Geoff
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 250e18--half of qidai, all of zrx. += (.25 + .5) * 100
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+
+Test "TransferComp handles running out of BENQI in Comptroller correctly"
+    FlywheelComptroller price:1.0 borrowRate:0.000005 qiInitAmount:1e18
+    InitSpeeds
+    FastForward 2 Blocks
+    Comptroller ClaimQi Geoff
+    Assert Equal (Comptroller QiAccrued Geoff) 2e18
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 0
+    Give (Address Comptroller) 1e18 BENQI
+    Comptroller ClaimQi Geoff
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 2e18
+
+Test "Changing BENQI rate continues to distribute at the correct speed"
+    FlywheelComptroller
+    InitSpeeds
+    --
+    Assert Equal (Comptroller QiSpeed qiZRX) 1e18
+    FastForward 10 Blocks
+    Comptroller SetQiRate 2e18
+    Assert Equal (Comptroller QiSpeed qiZRX) 2e18
+    FastForward 10 Blocks
+    Comptroller ClaimQi Geoff
+    Assert Equal (Comptroller QiAccrued Geoff) 0
+    Assert Equal (Erc20 BENQI TokenBalance Geoff) 30e18

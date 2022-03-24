@@ -1,0 +1,140 @@
+-- Enter and Exit Markets Tests
+
+Test "Enter Markets Idempotent"
+	NewComptroller
+	Assert Equal (Comptroller MembershipLength Geoff) Zero
+	Assert Equal (Comptroller AssetsIn Geoff) []
+	ListedQiToken ZRX qiZRX
+	EnterMarkets Geoff qiZRX
+	Assert Log MarketEntered (qiToken (Address qiZRX)) (account (Address Geoff))
+	Assert Equal (Comptroller MembershipLength Geoff) (Exactly 1)
+	Assert True (Comptroller CheckMembership Geoff qiZRX)
+	ListedQiToken OMG cOMG
+	EnterMarkets Geoff qiZRX cOMG
+	Assert Equal (Comptroller MembershipLength Geoff) (Exactly 2)
+	Assert True (Comptroller CheckMembership Geoff qiZRX)
+	Assert True (Comptroller CheckMembership Geoff cOMG)
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX) (Address cOMG)]
+
+Test "Entered Market Must Be Supported"
+	NewComptroller
+	Assert Equal (Comptroller MembershipLength Geoff) Zero
+	ListedQiToken ZRX qiZRX
+	EnterMarkets Geoff qiZRX
+	Assert Equal (Comptroller MembershipLength Geoff) (Exactly 1)
+	NewQiToken OMG cOMG
+	EnterMarkets Geoff qiZRX cOMG
+	Assert Equal (Comptroller MembershipLength Geoff) (Exactly 1)
+	Assert True (Comptroller CheckMembership Geoff qiZRX)
+	Assert False (Comptroller CheckMembership Geoff cOMG)
+	Support cOMG
+	EnterMarkets Geoff qiZRX cOMG
+	Assert Equal (Comptroller MembershipLength Geoff) (Exactly 2)
+	Assert True (Comptroller CheckMembership Geoff qiZRX)
+	Assert True (Comptroller CheckMembership Geoff cOMG)
+
+Test "Exit single market"
+	NewComptroller
+	ListedQiToken ZRX qiZRX
+	EnterMarkets Geoff qiZRX
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX)]
+	ExitMarket Geoff qiZRX
+	Assert Equal (Comptroller AssetsIn Geoff) []
+
+Test "Exit non-entered market"
+	NewComptroller
+	ListedQiToken ZRX qiZRX
+	ExitMarket Geoff qiZRX
+	Assert Equal (Comptroller AssetsIn Geoff) []
+
+Test "Exit one of two market from the front"
+	NewComptroller
+	ListedQiToken ZRX qiZRX
+	ListedQiToken OMG cOMG
+	EnterMarkets Geoff qiZRX cOMG
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX) (Address cOMG)]
+	ExitMarket Geoff qiZRX
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address cOMG)]
+
+Test "Exit one of two market from the back"
+	NewComptroller
+	ListedQiToken ZRX qiZRX
+	ListedQiToken OMG cOMG
+	EnterMarkets Geoff qiZRX cOMG
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX) (Address cOMG)]
+	ExitMarket Geoff cOMG
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX)]
+
+Test "Exit multiple markets"
+	NewComptroller
+	ListedQiToken ZRX qiZRX
+	ListedQiToken OMG cOMG
+	ListedQiToken BAT qiBAT
+	ListedQiToken REP qiREP
+	ListedQiToken DAI qiDAI
+	EnterMarkets Geoff qiZRX cOMG qiBAT qiREP qiDAI
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX) (Address cOMG) (Address qiBAT) (Address qiREP) (Address qiDAI)]
+	ExitMarket Geoff qiZRX
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiDAI) (Address cOMG) (Address qiBAT) (Address qiREP)]
+	ExitMarket Geoff qiREP
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiDAI) (Address cOMG) (Address qiBAT)]
+	ExitMarket Geoff cOMG
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiDAI) (Address qiBAT)]
+	ExitMarket Geoff qiDAI
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiBAT)]
+	ExitMarket Geoff qiBAT
+	Assert Equal (Comptroller AssetsIn Geoff) []
+
+Test "Realistic Market Scenario"
+	PricedComptroller
+	ListedQiToken ZRX qiZRX
+	SetPriceCF qiZRX 0.002 0.4
+	ListedAvaxToken qiAVAX
+	Comptroller SetCollateralFactor qiAvax 0.8
+	ListedQiToken BAT qiBAT
+	SetPriceCF qiBAT 0.0015 0.3
+	-- Mint some qiZRX and qiAVAX
+	Prep Geoff 1250e18 ZRX qiZRX
+	Mint Geoff 1250e18 qiZRX -- Liquidity -> 0.4 * 0.002 * 1250e18 = 1.0e18
+	SendMintAvax Geoff 2.5e18 qiAVAX -- Liqiuidity -> 0.8 * 1.0 * 2.5e18 = 2.0e18
+	-- Check liquidity is zero when not in any markets
+	Assert Equal (Comptroller Liquidity Geoff) Zero
+	-- Enter ZRX and check liquidity
+	EnterMarkets Geoff qiZRX
+	Assert Equal (Comptroller Liquidity Geoff) 1.0e18
+	-- Fail to borrow BAT due to liquidity
+	Give qiBAT 1000e18 BAT
+	HoldInvariants
+	Borrow Geoff 1000e18 qiBAT -- 1000e18 * 0.0015 = 1.5e18 required liquidity
+							  -- But since we're only in ZRX, we only have 1.0e18 liquidity
+	Assert Failure COMPTROLLER_REJECTION BORROW_COMPTROLLER_REJECTION INSUFFICIENT_LIQUIDITY
+	-- Enter qiAVAX and check liquidity
+	EnterMarkets Geoff qiAVAX
+	Assert Equal (Comptroller Liquidity Geoff) 3.0e18 -- Sum of qiAVAX and qiZRX liquidity from above
+	-- Borrow previous BAT amount given liquidity
+	Borrow Geoff 1000e18 qiBAT
+	Assert Equal (Comptroller Liquidity Geoff) 1.5e18 -- Less the borrow amount's toll
+	-- Try to exit a eth market but fail due to given borrow requiring eth as collateral
+	HoldInvariants
+	ExitMarket Geoff qiAVAX
+	Assert Failure REJECTION EXIT_MARKET_REJECTION INSUFFICIENT_LIQUIDITY -- Liquidity check fails
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX) (Address qiBAT) (Address qiAVAX)]
+	-- Repay some borrow and exit market OMG
+	Allow Geoff qiBAT
+	RepayBorrow Geoff 500e18 qiBAT
+	Assert Equal (Comptroller Liquidity Geoff) 2.25e18 -- With 0.75e18 repaid
+	ExitMarket Geoff qiAVAX
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX) (Address qiBAT)]
+	Assert Equal (Comptroller Liquidity Geoff) 0.25e18 -- Less Eth's 2.0e18 collateral weight
+	-- Try and exit qiBAT (firist without, then after, repaying)
+	HoldInvariants
+	ExitMarket Geoff qiBAT
+	Assert Failure NONZERO_BORROW_BALANCE EXIT_MARKET_BALANCE_OWED
+	RepayBorrow Geoff UInt256Max qiBAT
+	ExitMarket Geoff qiBAT
+	Assert Equal (Comptroller AssetsIn Geoff) [(Address qiZRX)]
+	Assert Equal (Comptroller Liquidity Geoff) 1.0e18 -- Back to just qiZRX
+	-- Exit qiZRX
+	ExitMarket Geoff qiZRX
+	Assert Equal (Comptroller AssetsIn Geoff) []
+	Assert Equal (Comptroller Liquidity Geoff) 0e18 -- Back to nothing

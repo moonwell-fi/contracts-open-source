@@ -1,0 +1,44 @@
+#!/usr/bin/env yarn repl -s
+
+PrintTransactionLogs
+Alias QiHolder "0xC89b6f0146642688bb254bF93C28fcCF1E182C81"
+Alias DaiHolder "0xf977814e90da44bfa03b6295a0616a897441acec"
+Alias QIUSDCHolder "0x5e34bc93a7506ecc8562ade4d5c8b090247a6349"
+Alias QiUsdtImplementation "0x976aa93ca5aaa569109f4267589c619a097f001d"
+Alias QiUsdtIRM "0xFB564da37B41b2F6B6EDcc3e56FbF523bD9F2012"
+Web3Fork "https://mainnet-eth.benqi.finance/@11447815" (QiHolder DaiHolder QIUSDCHolder)
+UseConfigs mainnet
+
+
+-- Delegate and propose update
+From QiHolder (Benqi Delegate QiHolder)
+From QiHolder (Governor GovernorAlpha Propose "Update qiDai implementation" [(Address qiDai) (Address qiDai)] [0 0] ["_setImplementation(address,bool,bytes)" "_setInterestRateModel(address)"] [[(address QiUsdtImplementation) true "0x"] [(address QiUsdtIRM)]])
+
+-- Fast forward, vote, queue, execute
+MineBlock
+From QiHolder (Governor GovernorAlpha Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorAlpha Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorAlpha Proposal LastProposal Execute
+
+-- Assert Dai retrieved from DSR
+Assert Equal (Erc20 Dai TokenBalance qiDai) (284058478303890709049107567)
+
+-- IRM changed correctly
+Assert Equal (QiToken qiDai InterestRateModel) (Address QiUsdtIRM)
+
+-- Ensure accrue interest works
+QiToken qiDai AccrueInterest
+
+-- Mint Test
+From DaiHolder (Erc20 Dai Approve (Address qiDai) 10000000)
+From DaiHolder (QiToken qiDai Mint 10000000)
+Assert Equal (Erc20 Dai TokenBalance qiDai) (284058478303890709059107567)
+
+-- Borrow Test
+From QIUSDCHolder (QiToken qiDai Borrow 10000000)
+Assert Equal (Erc20 Dai TokenBalance QIUSDCHolder) (4235678125976069)
+Assert Equal (Erc20 Dai TokenBalance qiDai) (284058478303890709049107567)
+
+Print "qiDai implementation migration ok" 

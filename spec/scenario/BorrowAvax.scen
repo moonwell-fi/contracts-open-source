@@ -1,0 +1,49 @@
+
+Test "Borrow some Eth enters Eth and succeeds when Eth not entered"
+    NewComptroller price:1.0
+    ListedQiToken ZRX qiZRX
+    ListedAvaxToken qiAVAX initialExchangeRate:0.005e9
+    SetCollateralFactor qiZRX collateralFactor:0.5
+    SetCollateralFactor qiAVAX collateralFactor:0.5
+    Donate qiAVAX 0.003e18
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 1e18 qiZRX
+    EnterMarkets Geoff qiZRX
+    Expect Changes (AvaxBalance Geoff) +0.001e18
+    BorrowAvax Geoff 0.001e18 qiAVAX
+    Assert Equal (AvaxBalance qiAVAX) 0.002e18
+    Assert Equal (Comptroller Liquidity Geoff) 4.99e17
+    Assert Equal (Comptroller MembershipLength Geoff) (Exactly 2)
+    Assert True (Comptroller CheckMembership Geoff qiAVAX)
+
+Test "Borrow some AVAX fails when no AVAX available"
+    NewComptroller price:1.0
+    ListedQiToken ZRX qiZRX
+    ListedAvaxToken qiAVAX initialExchangeRate:0.005e9
+    SetCollateralFactor qiZRX collateralFactor:0.5
+    SetCollateralFactor qiAVAX collateralFactor:0.5
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 100e18 qiZRX
+    EnterMarkets Geoff qiZRX qiAVAX
+    AllowFailures
+    Invariant Static (QiToken qiZRX ExchangeRateStored)
+    Invariant Static (QiToken qiAVAX ExchangeRateStored)
+    Invariant Static (Comptroller Liquidity Geoff)
+    Invariant Static (AvaxBalance Geoff)
+    BorrowAvax Geoff 1e18 qiAVAX
+    Assert Failure TOKEN_INSUFFICIENT_CASH BORROW_CASH_NOT_AVAILABLE
+
+Test "Borrow some AVAX from excess cash"
+    NewComptroller price:1.0
+    ListedQiToken ZRX qiZRX
+    ListedAvaxToken qiAVAX initialExchangeRate:0.005e9
+    SetCollateralFactor qiZRX collateralFactor:0.5
+    SetCollateralFactor qiAVAX collateralFactor:0.5
+    Donate qiAVAX 0.003e18
+    Prep Geoff Some ZRX qiZRX
+    Mint Geoff 1e18 qiZRX
+    EnterMarkets Geoff qiZRX qiAVAX
+    Expect Changes (AvaxBalance Geoff) +0.001e18
+    BorrowAvax Geoff 0.001e18 qiAVAX
+    Assert Equal (AvaxBalance qiAVAX) 0.002e18
+    Assert Equal (Comptroller Liquidity Geoff) 4.99e17
