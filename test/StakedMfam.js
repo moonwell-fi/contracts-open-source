@@ -113,7 +113,8 @@ describe("StakedMfam", function () {
 
     await stakedMfam.connect(user1).stake(user1.address, parseEther("10"));
     expect(await mfam.balanceOf(user1.address)).to.be.equal(parseEther("90")); // 100 - 10 staked
-    
+    await expect(stakedMfam.connect(user1).redeem(user1.address, parseEther("10"))).to.be.revertedWith("UNSTAKE_WINDOW_FINISHED");
+
     expect(await stakedMfam.stakersCooldowns(user1.address)).to.be.equal(0);
     await stakedMfam.connect(user1).cooldown(); // 10 cooldown
     expect(await stakedMfam.stakersCooldowns(user1.address)).to.be.gt(0);

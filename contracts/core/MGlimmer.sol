@@ -149,8 +149,9 @@ contract MGlimmer is MToken {
     }
 
     function doTransferOut(address payable to, uint amount) internal {
-        /* Send the Glimmer, with minimal gas and revert on failure */
-        (bool success, ) = to.call.value(amount)("");
+        /* Send the Glimmer, with the gas limit configured in the comptroller. */
+        uint16 gasAmount = comptroller.gasAmount();
+        (bool success, ) = to.call.value(amount).gas(gasAmount)("");
         require(success, "Transfer failed");
     }
 

@@ -4,6 +4,9 @@ contract ComptrollerInterface {
     /// @notice Indicator that this is a Comptroller contract (for inspection)
     bool public constant isComptroller = true;
 
+    /// @notice The amount of gas to use when making a native asset transfer.
+    uint16 public gasAmount;
+
     /*** Assets You Are In ***/
 
     function enterMarkets(address[] calldata mTokens) external returns (uint[] memory);

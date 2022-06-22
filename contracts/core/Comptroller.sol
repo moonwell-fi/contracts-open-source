@@ -56,7 +56,7 @@ contract Comptroller is ComptrollerVXStorage, ComptrollerInterface, ComptrollerE
     event DistributedBorrowerReward(uint8 indexed tokenType, MToken indexed mToken, address indexed borrower, uint wellDelta, uint wellBorrowIndex);
 
     /// @notice Emitted when WELL or GLMR is distributed to a supplier
-    event DistributedSupplierReward(uint8 indexed tokenType, MToken indexed mToken, address indexed borrower, uint wellDelta, uint wellBorrowIndex);
+    event DistributedSupplierReward(uint8 indexed tokenType, MToken indexed mToken, address indexed supplier, uint wellDelta, uint wellSupplyIndex);
 
     /// @notice Emitted when borrow cap for a mToken is changed
     event NewBorrowCap(MToken indexed mToken, uint newBorrowCap);
@@ -82,6 +82,12 @@ contract Comptroller is ComptrollerVXStorage, ComptrollerInterface, ComptrollerE
     // reward token type to show WELL or GLMR
     uint8 public constant rewardWell = 0;
     uint8 public constant rewardGlmr = 1;
+
+    // The amount of gas to use when making a native asset transfer.
+    uint16 public gasAmount = 2300;
+
+    /// @notice Emitted when the admin changes the gas amount.
+    event NewGasAmount(uint16 oldGasAmount, uint16 newGasAmount);
 
     constructor() public {
         admin = msg.sender;
@@ -1000,6 +1006,29 @@ contract Comptroller is ComptrollerVXStorage, ComptrollerInterface, ComptrollerE
         return uint(Error.NO_ERROR);
     }
 
+    /**
+     * @notice Admin function to change the amount of gas sent with native token transfers
+     * @param newGasAmount The new gas amount to use on native asset transfers.
+     * @return uint 0=success, otherwise a failure. (See enum Error for details)
+     */
+    function _setGasAmount(uint16 newGasAmount) public returns (uint) {
+        if (msg.sender != admin) {
+            return fail(Error.UNAUTHORIZED, FailureInfo.SET_GAS_AMOUNT_OWNER_CHECK);
+        }
+        require(newGasAmount >= 2300);
+
+        // Save current value for inclusion in log
+        uint16 oldGasAmount = gasAmount;
+
+        // Store gasAmount with value gasAmount
+        gasAmount = newGasAmount;
+
+        // Emit NewGasAmount(oldGasAmount, newGasAmount)
+        emit NewGasAmount(oldGasAmount, newGasAmount);
+
+        return uint(Error.NO_ERROR);
+    }
+
     function _setMintPaused(MToken mToken, bool state) public returns (bool) {
         require(markets[address(mToken)].isListed, "cannot pause a market that is not listed");
         require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
@@ -1297,7 +1326,7 @@ contract Comptroller is ComptrollerVXStorage, ComptrollerInterface, ComptrollerE
         } else if (rewardType == 1) {
             uint glmrRemaining = address(this).balance;
             if (amount > 0 && amount <= glmrRemaining) {
-                (bool success, ) = user.call.value(amount)("");
+                (bool success, ) = user.call.value(amount).gas(gasAmount)("");
                 require(success, "Transfer failed");
                 return 0;
             }

@@ -27,12 +27,13 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-etherscan": "^3.0.1",
-    "@nomiclabs/hardhat-truffle5": "^2.0.4",
+    "@nomiclabs/hardhat-truffle5": "^2.0.5",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@nomiclabs/hardhat-web3": "^2.0.0",
-    "@openzeppelin/contracts": "^4.5.0",
+    "@openzeppelin/contracts": "^4.6.0",
     "@openzeppelin/hardhat-upgrades": "^1.14.0",
     "@openzeppelin/test-helpers": "^0.5.15",
+    "@types/mocha": "^9.1.0",
     "bignumber.js": "9.0.0",
     "chai": "^4.3.6",
     "ethereum-waffle": "^3.4.0",
@@ -49,7 +50,9 @@
     "@truffle/hdwallet-provider": "^1.4.1",
     "dotenv": "^10.0.0",
     "hardhat-abi-exporter": "^2.8.0",
-    "keccak256": "^1.0.6"
+    "keccak256": "^1.0.6",
+    "mocha": "^9.2.2",
+    "typescript": "^4.6.3"
   },
   "resolutions": {
     "scrypt.js": "https://registry.npmjs.org/@compound-finance/ethereumjs-wallet/-/ethereumjs-wallet-0.6.3.tgz",
