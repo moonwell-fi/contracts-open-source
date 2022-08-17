@@ -148,4 +148,20 @@ describe("StakedWell", function () {
     expect(await well.balanceOf(user1.address)).to.be.equal(parseEther("97")); // 90 + 7
     expect(await well.balanceOf(ecosystemReserve.address)).to.be.equal(parseEther("493")); // 500 - 7
   })
+
+  it("Set Emissions Manager - can change emissions manager", async function () {
+    // GIVEN a StakedToken Contract with an emissions manager
+    // WHEN the emissions manager is changed
+    await stakedWell.connect(emissionManager).setEmissionsManager(user1.address)
+
+    // THEN the emissions manager is updated.
+    expect(await stakedWell.EMISSION_MANAGER()).to.be.equal(user1.address)
+  })
+
+  it("Set Emissions Manager - fails when not called by emissions manager", async function () {
+    // GIVEN a StakedToken Contract with an emissions manager
+    // WHEN the emissions manager is changed by someone other than the emissions manager
+    // THEN the call is reverted.
+    await expect(stakedWell.connect(user1).setEmissionsManager(user1.address)).to.be.revertedWith('ONLY_EMISSION_MANAGER');
+  })
 });

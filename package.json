@@ -47,6 +47,7 @@
     "ts-node": "^10.4.0"
   },
   "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^4.7.2",
     "@truffle/hdwallet-provider": "^1.4.1",
     "dotenv": "^10.0.0",
     "hardhat-abi-exporter": "^2.8.0",

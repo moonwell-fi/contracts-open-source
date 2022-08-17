@@ -267,4 +267,12 @@ contract DistributionManager is IDistributionManager {
   function getUserAssetData(address user, address asset) public view returns (uint256) {
     return assets[asset].users[user];
   }
+
+  /**
+   * @dev Changes the emissions manager.
+   */
+  function setEmissionsManager(address newEmissionsManager) external {
+    require(msg.sender == EMISSION_MANAGER, 'ONLY_EMISSION_MANAGER');
+    EMISSION_MANAGER = newEmissionsManager;
+  }
 }

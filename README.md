@@ -24,7 +24,7 @@ We detail a few of the core contracts in the Moonwell Protocol.
 </dl>
 
 <dl>
-  <dt>Governor Alpha</dt>
+  <dt>Moonwell Artemis Governor</dt>
   <dd>The administrator of the Moonwell timelock contract. Holders of Moonwell token may create and vote on proposals which will be queued into the Moonwell timelock and then have effects on Moonwell mToken and Comptroller contracts. This contract may be replaced in the future with a beta version.</dd>
 </dl>
 

@@ -353,31 +353,38 @@ contract TokenSaleDistributor is ReentrancyGuard, TokenSaleDistributorStorage {
     }
 
     /**
-     * @notice Reset all data for the given addresses.
-     * @param recipients Addresses whose data to reset. this will also reduce the voting power of these users.
+     * @notice Reset all claims data for the given addresses and transfer tokens to the admin.
+     * @param targetUser The address data to reset. This will also reduce the voting power of these users.
      */
-    function resetAllocationsByUser(address[] memory recipients) external adminOnly {
-        uint length = recipients.length;
-        for (uint i; i < length; ++i) {
-            uint votingPower = totalVotingPower(recipients[i]);
-            _moveDelegates(delegates[recipients[i]], address(0), votingPower);
-            delete allocations[recipients[i]];
+    function resetAllocationsByUser(address targetUser) external adminOnly {
+        // Get the user's current total voting power, which is the number of unclaimed tokens in the contract
+        uint votingPower = totalVotingPower(targetUser);
+        
+        // Decrease the voting power to zero
+        _moveDelegates(delegates[targetUser], address(0), votingPower);
+
+        // Delete all allocations
+        delete allocations[targetUser];
+    
+        // Withdraw tokens associated with the user's voting power
+        if (votingPower != 0) {
+             IERC20(tokenAddress).safeTransfer(admin, votingPower);
         }
+        emit AdminWithdrewTokens(tokenAddress, votingPower, admin);
     }
 
     /**
-     * @notice Withdraw deposited tokens from the contract. The target user's voting power will be reduced as a consequence.g
+     * @notice Withdraw deposited tokens from the contract. This method cannot be used with the reward token
+     *
      * @param token The token address to withdraw
      * @param amount Amount to withdraw from the contract balance
-     * @param targetUser The user to deduct voting power from.
      */
-    function withdraw(address token, uint amount, address targetUser) external adminOnly {
+    function withdraw(address token, uint amount) external adminOnly {
+        require(token != tokenAddress, "use resetAllocationsByUser");
+
         if (amount != 0) {
             IERC20(token).safeTransfer(admin, amount);
         }
-        emit AdminWithdrewTokens(token, amount, targetUser);
-
-        _moveDelegates(delegates[targetUser], address(0), amount);
     }
 
     /**

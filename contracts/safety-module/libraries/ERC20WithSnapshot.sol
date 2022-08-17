@@ -32,6 +32,62 @@ contract ERC20WithSnapshot is ERC20 {
     }
 
     /**
+     * @notice Gets the current votes balance for `account`
+     * @param account The address to get votes balance
+     * @return The number of current votes for `account`
+     */
+    function getCurrentVotes(address account) external view returns (uint256) {
+        uint256 nCheckpoints = _countsSnapshots[account];
+        return
+            nCheckpoints != 0 ? _snapshots[account][nCheckpoints - 1].value : 0;
+    }
+
+    /**
+     * @notice Determine the prior number of votes for an account as of a block number
+     * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
+     * @param account The address of the account to check
+     * @param blockNumber The block number to get the vote balance at
+     * @return The number of votes the account had as of the given block
+     */
+    function getPriorVotes(address account, uint256 blockNumber)
+        external
+        view
+        returns (uint256)
+    {
+        require(blockNumber < block.number, "not yet determined");
+
+        uint256 nCheckpoints = _countsSnapshots[account];
+        if (nCheckpoints == 0) {
+            return 0;
+        }
+
+        // First check most recent balance
+        if (_snapshots[account][nCheckpoints - 1].blockNumber <= blockNumber) {
+            return _snapshots[account][nCheckpoints - 1].value;
+        }
+
+        // Next check implicit zero balance
+        if (_snapshots[account][0].blockNumber > blockNumber) {
+            return 0;
+        }
+
+        uint256 lower = 0;
+        uint256 upper = nCheckpoints - 1;
+        while (upper > lower) {
+            uint256 center = upper - (upper - lower) / 2; // ceil, avoiding overflow
+            Snapshot memory cp = _snapshots[account][center];
+            if (cp.blockNumber == blockNumber) {
+                return cp.value;
+            } else if (cp.blockNumber < blockNumber) {
+                lower = center;
+            } else {
+                upper = center - 1;
+            }
+        }
+        return _snapshots[account][lower].value;
+    }
+
+    /**
     * @dev Writes a snapshot for an owner of tokens
     * @param owner The owner of the tokens
     * @param oldValue The value before the operation that is gonna be executed after the snapshot

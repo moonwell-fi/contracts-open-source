@@ -1,5 +1,5 @@
 import { BigNumber, Signer } from "ethers";
-import { address, call, send } from "./utils";
+import { call, send } from "./utils";
 const { ethers } = require('hardhat')
 const hre = require('hardhat')
 import { expect } from "chai";
@@ -71,7 +71,7 @@ describe('TokenDistributorVotes', () => {
     );
 
     await claimsContract.setTokenAddress(rewardToken.address);
-    await rewardToken.transfer(claimsContract.address, ethers.utils.parseEther("1000000"));
+    await rewardToken.transfer(claimsContract.address, ethers.utils.parseEther("7200000000"));
 
     epoch = BigNumber.from(Math.floor(new Date().getTime() / 1000));
 
@@ -216,7 +216,7 @@ describe('TokenDistributorVotes', () => {
     await expect(call(claimsContract, 'getPriorVotes', [aliceAddress, currentBlock + 1])).to.be.revertedWith('not yet determined')
   })
 
-  it('getPriorVotes - returns zero if there are no checkpoitns', async () => {
+  it('getPriorVotes - returns zero if there are no checkpoints', async () => {
     // GIVEN Alice has no allocations
     const aliceAddress = await alice.getAddress()
 
@@ -495,16 +495,31 @@ describe('TokenDistributorVotes', () => {
   });
 
   it('withdraw - reduces a users voting power', async () => {
-    // GIVEN Alice has one allocation
-    const amount = BigNumber.from('10000')
-    const aliceAddress = await alice.getAddress()
-    await send(claimsContract, 'setAllocations', [[aliceAddress], [true], [epoch], [VESTING_DURATION], [CLIFF], [CLIFF_PERCENTAGE], [amount]])
+    // GIVEN the voting contract has some tokens other than the reward token
+    const FaucetTokenFactory = await hre.ethers.getContractFactory("FaucetToken");
+    const otherTokenAmount = ethers.utils.parseEther("1000000")
+    const otherToken = await FaucetTokenFactory.deploy(
+      otherTokenAmount,
+      "Other Token",
+      BigNumber.from(18),
+      "OT",
+    );
 
-    // WHEN Half of Alice's tokens are revoked
-    await send(claimsContract, 'withdraw', [rewardToken.address, amount.div(2), aliceAddress])
+    await otherToken.transfer(claimsContract.address, otherTokenAmount);
 
-    // THEN her voting power is halved
-    expect(await call(claimsContract, 'getCurrentVotes', [aliceAddress])).to.equal(amount.div(2))
+    // WHEN the admin withdraws the other tokens
+    await send(claimsContract, 'withdraw', [otherToken.address, otherTokenAmount])
+
+    // THEN the tokens are moved to Alice's address
+    expect(await call(otherToken, 'balanceOf', [claimsContract.address])).to.equal(0)
+    expect(await call(otherToken, 'balanceOf', [await root.getAddress()])).to.equal(otherTokenAmount)
+  })
+
+  it('withdraw - failse if the token to withdraw is the reward token', async () => {
+    // GIVEN the voting contract
+    // WHEN the admin tries to withdraw the reward tokens
+    // THEN the call reverts
+    await expect(send(claimsContract, 'withdraw', [rewardToken.address, "1"])).to.be.revertedWith('use resetAllocationsByUser')
   })
 
   it('disableVoting - can enable and disable voting', async () => {
@@ -533,16 +548,20 @@ describe('TokenDistributorVotes', () => {
   it('resetAllocationsByUser - updates voting power', async () => {
     const delegatee = await root.getAddress()
 
-    // GIVEN that Alice has an allocation
-    const amount = BigNumber.from('10000')
+    // GIVEN Alice has two allocations
+    const amount1 = BigNumber.from('10000')
+    const amount2 = BigNumber.from('20000')
+    const aliceTotalAllocations = amount1.add(amount2)
     const aliceAddress = await alice.getAddress()
-    await send(claimsContract, 'setAllocations', [[aliceAddress], [true], [epoch], [VESTING_DURATION], [CLIFF], [CLIFF_PERCENTAGE], [amount]])
 
-    // AND the delegate is delegated to itself.
+    await send(claimsContract, 'setAllocations', [[aliceAddress], [true], [epoch], [VESTING_DURATION], [CLIFF], [CLIFF_PERCENTAGE], [amount1]])
+    await send(claimsContract, 'setAllocations', [[aliceAddress], [true], [epoch], [VESTING_DURATION], [CLIFF], [CLIFF_PERCENTAGE], [amount2]])
+
+    // AND the delegate is delegated to the admin
     await send(claimsContract, 'delegate', [delegatee], { from: root })
 
     // THEN Alice has the voting power and the delegate has zero
-    expect(await call(claimsContract, 'getCurrentVotes', [aliceAddress])).to.equal(amount)
+    expect(await call(claimsContract, 'getCurrentVotes', [aliceAddress])).to.equal(aliceTotalAllocations)
     expect(await call(claimsContract, 'getCurrentVotes', [delegatee])).to.equal(0)
 
     // WHEN Alice delegates to the delegate
@@ -553,16 +572,20 @@ describe('TokenDistributorVotes', () => {
 
     // AND voting power is transferred to the delegate
     expect(await call(claimsContract, 'getCurrentVotes', [aliceAddress])).to.equal(0)
-    expect(await call(claimsContract, 'getCurrentVotes', [delegatee])).to.equal(amount)
+    expect(await call(claimsContract, 'getCurrentVotes', [delegatee])).to.equal(aliceTotalAllocations)
 
     // WHEN when Alice's claims are reset
-    await send(claimsContract, 'resetAllocationsByUser', [[aliceAddress]])
+    await send(claimsContract, 'resetAllocationsByUser', [aliceAddress])
 
     // THEN the delegate's voting power is reduced
     expect(await call(claimsContract, 'getCurrentVotes', [delegatee])).to.equal(0)
 
     // AND Alice has no voting power
     expect(await call(claimsContract, 'getCurrentVotes', [aliceAddress])).to.equal(0)
+
+    // AND the admin takes possesion of the tokens.
+    console.log(JSON.stringify(rewardToken.methods, null, 2))
+    expect(await call(rewardToken, 'balanceOf', [await root.getAddress()])).to.equal(aliceTotalAllocations)
   });
 
 });

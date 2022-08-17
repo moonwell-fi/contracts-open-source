@@ -10,10 +10,11 @@ contract Timelock {
     event NewDelay(uint indexed newDelay);
     event CancelTransaction(bytes32 indexed txHash, address indexed target, uint value, string signature,  bytes data, uint eta);
     event ExecuteTransaction(bytes32 indexed txHash, address indexed target, uint value, string signature,  bytes data, uint eta);
+    event FastTrackExecuteTransaction(bytes32 indexed txHash, address indexed target, uint value, string signature,  bytes data);
     event QueueTransaction(bytes32 indexed txHash, address indexed target, uint value, string signature, bytes data, uint eta);
 
     uint public constant GRACE_PERIOD = 14 days;
-    uint public constant MINIMUM_DELAY = 2 days;
+    uint public constant MINIMUM_DELAY = 1 days;
     uint public constant MAXIMUM_DELAY = 30 days;
 
     address public admin;
@@ -22,7 +23,6 @@ contract Timelock {
 
     mapping (bytes32 => bool) public queuedTransactions;
 
-
     constructor(address admin_, uint delay_) public {
         require(delay_ >= MINIMUM_DELAY, "Timelock::constructor: Delay must exceed minimum delay.");
         require(delay_ <= MAXIMUM_DELAY, "Timelock::setDelay: Delay must not exceed maximum delay.");
@@ -30,8 +30,6 @@ contract Timelock {
         admin = admin_;
         delay = delay_;
     }
-
-    function() external payable { }
 
     function setDelay(uint delay_) public {
         require(msg.sender == address(this), "Timelock::setDelay: Call must come from Timelock.");
@@ -51,7 +49,6 @@ contract Timelock {
     }
 
     function setPendingAdmin(address pendingAdmin_) public {
-        require(pendingAdmin_ != address(0), "address can not be zero.");
         require(msg.sender == address(this), "Timelock::setPendingAdmin: Call must come from Timelock.");
         pendingAdmin = pendingAdmin_;
 
@@ -101,6 +98,33 @@ contract Timelock {
         require(success, "Timelock::executeTransaction: Transaction execution reverted.");
 
         emit ExecuteTransaction(txHash, target, value, signature, data, eta);
+
+        return returnData;
+    }
+
+    function fastTrackExecuteTransaction(
+        address target, 
+        uint value, 
+        string memory signature, 
+        bytes memory data 
+    ) public payable returns (bytes memory) {
+        require(msg.sender == admin, "Timelock::fastTrackExecuteTransaction: Call must come from admin.");
+
+        uint eta = block.timestamp;
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+        bytes memory callData;
+
+        if (bytes(signature).length == 0) {
+            callData = data;
+        } else {
+            callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
+        }
+
+        // solium-disable-next-line security/no-call-value
+        (bool success, bytes memory returnData) = target.call.value(value)(callData);
+        require(success, "Timelock::fastTrackExecuteTransaction: Transaction execution reverted.");
+
+        emit FastTrackExecuteTransaction(txHash, target, value, signature, data);
 
         return returnData;
     }
