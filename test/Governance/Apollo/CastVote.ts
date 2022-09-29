@@ -1,8 +1,8 @@
 const {
     encodeParameters,
-} = require('../Utils/Ethereum');
+} = require('../../Utils/Ethereum');
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../utils";
+import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../../utils";
 const hre = require('hardhat')
 import { expect } from "chai";
 import { solidity } from "ethereum-waffle";
@@ -15,12 +15,16 @@ const VOTE_YES = 0
 const VOTE_NO = 1
 const VOTE_ABSTAIN = 2
 
+const QUORUM = 300
+const LOWER_QUORUM_CAP = 100
+const UPPER_QUORUM_CAP = 500
+
 async function enfranchise(govToken: any, actor: any, amount: number) {
   await send(govToken, 'transfer', [await actor.getAddress(), BigNumber.from(amount).mul(BigNumber.from(10).pow(18))]);
   await send(govToken, 'delegate', [await actor.getAddress()], { from: actor });
 }
 
-describe("GovernorArtemis#castVote/2", () => {
+describe("GovernorApollo#castVote/2", () => {
   let govToken: any
   let gov: any
   let root: SignerWithAddress
@@ -71,7 +75,7 @@ describe("GovernorArtemis#castVote/2", () => {
     await (await distributorImplementation.becomeImplementation(distributorProxy.address)).wait();
     const distributor = tokenSaleDistributorFactory.attach(distributorProxy.address);
 
-    const govFactory = await hre.ethers.getContractFactory("MoonwellGovernorArtemis")
+    const govFactory = await hre.ethers.getContractFactory("MoonwellGovernorApollo")
     gov = await govFactory.deploy(
       hre.ethers.constants.AddressZero,
       govToken.address,
@@ -80,7 +84,10 @@ describe("GovernorArtemis#castVote/2", () => {
       await root.getAddress(),
       await root.getAddress(),
       await root.getAddress(),
-      0
+      0,
+      QUORUM,
+      LOWER_QUORUM_CAP,
+      UPPER_QUORUM_CAP
     )    
 
     targets = [await a1.getAddress()];
@@ -96,7 +103,7 @@ describe("GovernorArtemis#castVote/2", () => {
     it("There does not exist a proposal with matching proposal id where the current block number is between the proposal's start block (exclusive) and end block (inclusive)", async () => {
       await expect(
         call(gov, 'castVote', [proposalId, VOTE_YES])
-      ).to.be.revertedWith("GovernorArtemis::_castVote: voting is closed");
+      ).to.be.revertedWith("GovernorApollo::_castVote: voting is closed");
     });
 
     it("Such proposal already has an entry in its voters set matching the sender", async () => {
@@ -106,7 +113,7 @@ describe("GovernorArtemis#castVote/2", () => {
       await send(gov, 'castVote', [proposalId, VOTE_YES], { from: accounts[4] });
       await expect(
         send(gov, 'castVote', [proposalId, VOTE_YES], { from: accounts[4] })
-      ).to.be.revertedWith("GovernorArtemis::_castVote: voter already voted");
+      ).to.be.revertedWith("GovernorApollo::_castVote: voter already voted");
     });
   });
 
@@ -179,7 +186,7 @@ describe("GovernorArtemis#castVote/2", () => {
     });
 
     describe('castVoteBySig', () => {
-      const makeDomain = (govContract: any, chainId: string) => ({ name: 'Moonwell Artemis Governor', chainId, verifyingContract: govContract.address });
+      const makeDomain = (govContract: any, chainId: string) => ({ name: 'Moonwell Apollo Governor', chainId, verifyingContract: govContract.address });
       const TYPES = {
         Ballot: [
           {name: 'proposalId', type: 'uint256' },
@@ -188,7 +195,7 @@ describe("GovernorArtemis#castVote/2", () => {
       };
     
       it('reverts if the signatory is invalid', async () => {
-        await expect(send(gov, 'castVoteBySig', [proposalId, VOTE_YES, 0, '0xbad122334455667788990011223344556677889900112233445566778899aaaa', '0xbad122334455667788990011223344556677889900112233445566778899aaaa'])).to.be.revertedWith("GovernorArtemis::castVoteBySig: invalid signature");
+        await expect(send(gov, 'castVoteBySig', [proposalId, VOTE_YES, 0, '0xbad122334455667788990011223344556677889900112233445566778899aaaa', '0xbad122334455667788990011223344556677889900112233445566778899aaaa'])).to.be.revertedWith("GovernorApollo::castVoteBySig: invalid signature");
       });
 
       it('casts vote on behalf of the signatory', async () => {

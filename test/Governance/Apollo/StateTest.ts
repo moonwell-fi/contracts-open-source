@@ -5,8 +5,8 @@ const {
   etherUnsigned,
   freezeTime,
   keccak256
-} = require('../Utils/Ethereum');
-import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../utils";
+} = require('../../Utils/Ethereum');
+import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../../utils";
 import { expect } from "chai";
 import { solidity } from "ethereum-waffle";
 import chai from "chai";
@@ -29,7 +29,11 @@ const VOTE_YES = 0
 const VOTE_NO = 1
 const VOTE_ABSTAIN = 2
 
-describe('GovernorArtemis#state/1', () => {
+const QUORUM = 300
+const LOWER_QUORUM_CAP = 100
+const UPPER_QUORUM_CAP = 500
+
+describe('GovernorApollo#state/1', () => {
   let govToken: any
   let gov: any
   let root: SignerWithAddress 
@@ -87,7 +91,7 @@ describe('GovernorArtemis#state/1', () => {
     timelock = await timelockFactory.deploy(await root.getAddress(), delay)
 
 
-    const govFactory = await hre.ethers.getContractFactory("MoonwellGovernorArtemis")
+    const govFactory = await hre.ethers.getContractFactory("MoonwellGovernorApollo")
     gov = await govFactory.deploy(
       timelock.address,
       govToken.address,
@@ -96,7 +100,10 @@ describe('GovernorArtemis#state/1', () => {
       await root.getAddress(),
       await root.getAddress(),
       await root.getAddress(),
-      0
+      0,
+      QUORUM,
+      LOWER_QUORUM_CAP,
+      UPPER_QUORUM_CAP
     )        
 
     await send(timelock, "harnessSetAdmin", [gov.address])
@@ -123,7 +130,7 @@ describe('GovernorArtemis#state/1', () => {
   })
 
   it("Invalid for proposal not found", async () => {
-    await expect(call(gov, 'state', ["5"])).to.be.revertedWith("GovernorArtemis::state: invalid proposal id")
+    await expect(call(gov, 'state', ["5"])).to.be.revertedWith("GovernorApollo::state: invalid proposal id")
   })
 
   it("Pending", async () => {

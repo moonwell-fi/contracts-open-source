@@ -5,8 +5,8 @@ const {
   etherUnsigned,
   freezeTime,
   keccak256
-} = require('../Utils/Ethereum');
-import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../utils";
+} = require('../../Utils/Ethereum');
+import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../../utils";
 import { expect } from "chai";
 import { solidity } from "ethereum-waffle";
 import chai from "chai";

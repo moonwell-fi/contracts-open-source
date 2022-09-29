@@ -1,5 +1,5 @@
 import { BigNumber, Signer } from "ethers";
-import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../utils";
+import { call, send, mineBlockWithTimestamp, resetHardhatNetwork  } from "../../utils";
 const { ethers } = require('hardhat')
 const hre = require('hardhat')
 import { expect } from "chai";
